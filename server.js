@@ -1,8 +1,14 @@
 require("dotenv").config();
+const punycode = require('punycode');
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const { SessionsClient } = require("@google-cloud/dialogflow"); // Import Dialogflow SDK
+const fs = require("fs");
+
+// Load Dialogflow credentials from JSON key file
+const CREDENTIALS = JSON.parse(fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS));
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -12,7 +18,7 @@ app.use(bodyParser.json());
 app.use(cors());
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI);
+mongoose.connect(process.env.MONGO_URI)
 
 const db = mongoose.connection;
 db.on("error", console.error.bind(console, "MongoDB connection error:"));
@@ -37,8 +43,13 @@ const InsuranceSchema = new mongoose.Schema({
 
 const InsuranceClaim = mongoose.model("InsuranceClaim", InsuranceSchema);
 
+// Create Dialogflow Session Client
+const sessionClient = new SessionsClient({ credentials: CREDENTIALS });
+
 // 🔹 Webhook Route for Dialogflow
 app.post("/webhook", async (req, res) => {
+    const sessionId = req.body.session || "default-session";
+    const sessionPath = sessionClient.projectAgentSessionPath(CREDENTIALS.project_id, sessionId);
     const intent = req.body.queryResult.intent.displayName;
     const parameters = req.body.queryResult.parameters;
 
